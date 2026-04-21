@@ -1,0 +1,221 @@
+#include <stdio.h>
+#include <stdlib.h>
+#include <string.h>
+
+struct Farmer {
+    char name[50];
+    char village[50];
+    float land;
+    int soil;    // 1-Black 2-Red 3-Alluvial 4-Sandy 5-Loamy
+    int season;  // 1-Kharif 2-Rabi 3-Zaid
+    int water;   // 1-Low 2-Medium 3-High
+    char suggestedCrop[30];
+    float totalCost;
+    float profit;
+};
+
+struct Crop {
+    char name[30];
+    int soil;
+    int season;
+    int water;
+    float costPerAcre;
+    float yieldPerAcre;   // in quintal
+    float pricePerQuintal;
+    char fertilizer[50];
+};
+
+void showMenu();
+void newFarmerEntry();
+void viewRecords();
+void searchRecord();
+void suggestAndCalculate(struct Farmer *f);
+
+struct Crop crops[] = {
+    {"Rice",     3, 1, 3, 12000, 20, 2200, "Urea + DAP"},
+    {"Wheat",    5, 2, 2, 9000,  18, 2100, "Urea"},
+    {"Cotton",   1, 1, 2, 15000, 12, 6000, "Urea + Potash"},
+    {"Soybean",  1, 1, 1, 8000,  10, 4000, "DAP"},
+    {"Gram",     4, 2, 1, 6000,  8,  5000, "Organic Manure"}
+};
+
+int cropCount = 5;
+
+int main() {
+    int choice;
+
+    do {
+        showMenu();
+        printf("Enter your choice: ");
+        scanf("%d", &choice);
+
+        switch(choice) {
+            case 1:
+                newFarmerEntry();
+                break;
+            case 2:
+                viewRecords();
+                break;
+            case 3:
+                searchRecord();
+                break;
+            case 4:
+                printf("Exiting program. Thank you!\n");
+                break;
+            default:
+                printf("Invalid choice!\n");
+        }
+
+    } while(choice != 4);
+
+    return 0;
+}
+
+void showMenu() {
+    printf("\n===== Farmer Crop Advisory System =====\n");
+    printf("1. New Farmer Entry & Crop Suggestion\n");
+    printf("2. View All Records\n");
+    printf("3. Search Farmer Record\n");
+    printf("4. Exit\n");
+}
+
+void newFarmerEntry() {
+    struct Farmer f;
+    FILE *fp;
+
+    printf("\nEnter farmer name: ");
+    scanf(" %[^\n]", f.name);
+
+    printf("Enter village: ");
+    scanf(" %[^\n]", f.village);
+
+    printf("Enter land size (in acres): ");
+    scanf("%f", &f.land);
+
+    printf("\nSelect Soil Type:\n");
+    printf("1. Black\n2. Red\n3. Alluvial\n4. Sandy\n5. Loamy\n");
+    printf("Enter choice: ");
+    scanf("%d", &f.soil);
+
+    printf("\nSelect Season:\n");
+    printf("1. Kharif\n2. Rabi\n3. Zaid\n");
+    printf("Enter choice: ");
+    scanf("%d", &f.season);
+
+    printf("\nSelect Water Availability:\n");
+    printf("1. Low\n2. Medium\n3. High\n");
+    printf("Enter choice: ");
+    scanf("%d", &f.water);
+
+    suggestAndCalculate(&f);
+
+    fp = fopen("farmer_records.dat", "ab");
+    if(fp == NULL) {
+        printf("Error opening file!\n");
+        return;
+    }
+
+    fwrite(&f, sizeof(struct Farmer), 1, fp);
+    fclose(fp);
+
+    printf("\nRecord saved successfully!\n");
+}
+
+void suggestAndCalculate(struct Farmer *f) {
+    int i, best = -1;
+
+    for(i = 0; i < cropCount; i++) {
+        if(crops[i].soil == f->soil && crops[i].season == f->season && crops[i].water == f->water) {
+            best = i;
+            break;
+        }
+    }
+
+    if(best == -1) {
+        best = 0; // default crop if no exact match
+    }
+
+    strcpy(f->suggestedCrop, crops[best].name);
+
+    float totalCost = crops[best].costPerAcre * f->land;
+    float totalYield = crops[best].yieldPerAcre * f->land;
+    float income = totalYield * crops[best].pricePerQuintal;
+    float profit = income - totalCost;
+
+    f->totalCost = totalCost;
+    f->profit = profit;
+
+    printf("\n=== Crop Recommendation Result ===\n");
+    printf("Suggested Crop: %s\n", crops[best].name);
+    printf("Fertilizer Advice: %s\n", crops[best].fertilizer);
+    printf("Estimated Total Cost: %.2f\n", totalCost);
+    printf("Estimated Profit: %.2f\n", profit);
+}
+
+void viewRecords() {
+    FILE *fp;
+    struct Farmer f;
+    int found = 0;
+
+    fp = fopen("farmer_records.dat", "rb");
+    if(fp == NULL) {
+        printf("\nNo records found!\n");
+        return;
+    }
+
+    printf("\n===== All Farmer Records =====\n");
+
+    while(fread(&f, sizeof(struct Farmer), 1, fp)) {
+        found = 1;
+        printf("\nName: %s", f.name);
+        printf("\nVillage: %s", f.village);
+        printf("\nLand: %.2f acres", f.land);
+        printf("\nSuggested Crop: %s", f.suggestedCrop);
+        printf("\nTotal Cost: %.2f", f.totalCost);
+        printf("\nProfit: %.2f", f.profit);
+        printf("\n---------------------------\n");
+    }
+
+    fclose(fp);
+
+    if(!found) {
+        printf("No records to display!\n");
+    }
+}
+
+void searchRecord() {
+    FILE *fp;
+    struct Farmer f;
+    char searchName[50];
+    int found = 0;
+
+    fp = fopen("farmer_records.dat", "rb");
+    if(fp == NULL) {
+        printf("\nNo records found!\n");
+        return;
+    }
+
+    printf("\nEnter farmer name to search: ");
+    scanf(" %[^\n]", searchName);
+
+    while(fread(&f, sizeof(struct Farmer), 1, fp)) {
+        if(strcmp(f.name, searchName) == 0) {
+            found = 1;
+            printf("\nRecord Found!");
+            printf("\nName: %s", f.name);
+            printf("\nVillage: %s", f.village);
+            printf("\nLand: %.2f acres", f.land);
+            printf("\nSuggested Crop: %s", f.suggestedCrop);
+            printf("\nTotal Cost: %.2f", f.totalCost);
+            printf("\nProfit: %.2f", f.profit);
+            printf("\n");
+            break;
+        }
+    }
+
+    fclose(fp);
+
+    if(!found) {
+        printf("\nRecord not found!\n");
+    }
+}
